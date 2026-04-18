@@ -227,15 +227,15 @@ with tab_sim:
     
     st.markdown("---")
     
+    # Physics Calculation
+    phys_res = simulate_beam(input_df)
+    p_vals = [phys_res['weight_kg'].iloc[0], phys_res['deflection_mm'].iloc[0], phys_res['max_stress_mpa'].iloc[0], phys_res['safety_factor'].iloc[0], phys_res['eigenfrequency_hz'].iloc[0]]
+
     # 3D Visualization
     fig = plot_beam_3d(length, width, height, phys_res['deflection_mm'].iloc[0])
     st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
-    
-    # Physics Calculation
-    phys_res = simulate_beam(input_df)
-    p_vals = [phys_res['weight_kg'].iloc[0], phys_res['deflection_mm'].iloc[0], phys_res['max_stress_mpa'].iloc[0], phys_res['safety_factor'].iloc[0], phys_res['eigenfrequency_hz'].iloc[0]]
     
     # Display 4-Column Metric View
     c1, c2, c3, c4 = st.columns(4)
