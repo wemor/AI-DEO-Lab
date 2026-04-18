@@ -107,7 +107,7 @@ def plot_beam_3d(length_mm, width_mm, height_mm, deflection_mm):
     fig.add_trace(go.Scatter3d(
         x=[0, length_mm], y=[0, 0], z=[0, 0],
         mode='markers',
-        marker=dict(size=10, color='red', symbol='cone'),
+        marker=dict(size=10, color='red', symbol='diamond'),
         name='Supports'
     ))
 
