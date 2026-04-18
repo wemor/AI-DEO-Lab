@@ -292,8 +292,49 @@ with tab_sim:
 
 # Tabs Storage, Opt and Docs (Brief)
 with tab_file:
-    st.info("Cloud storage via Firebase enabled.")
-    if st.button("Save results to Cloud"): st.success("Stored in Firebase.")
+    st.markdown("### 💾 Cloud Storage (Firestore)")
+    if db:
+        st.success("✅ Firebase-Verbindung aktiv.")
+        
+        # Data preparation for saving
+        save_data = {
+            "timestamp": firestore.SERVER_TIMESTAMP,
+            "inputs": input_df.iloc[0].to_dict(),
+            "results": {
+                "weight_kg": float(p_vals[0]),
+                "deflection_mm": float(p_vals[1]),
+                "max_stress_mpa": float(p_vals[2]),
+                "safety_factor": float(p_vals[3]),
+                "eigenfrequency_hz": float(p_vals[4])
+            },
+            "material": mat_choice,
+            "models_trained": {
+                "n_smart": st.session_state.models["n_smart"],
+                "n_bad": st.session_state.models["n_bad"]
+            }
+        }
+        
+        if st.button("🚀 Design in Cloud speichern", use_container_width=True):
+            try:
+                db.collection("simulations").add(save_data)
+                st.balloons()
+                st.success("Erfolgreich in Firebase gespeichert!")
+            except Exception as e:
+                st.error(f"Fehler beim Speichern: {e}")
+                
+        st.divider()
+        st.markdown("#### Letzte Simulationen")
+        try:
+            docs = db.collection("simulations").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(5).stream()
+            for doc in docs:
+                d = doc.to_dict()
+                st.write(f"📅 {d.get('timestamp')} | 🏗️ {d.get('material')} | {d['results']['weight_kg']:.2f} kg")
+        except:
+            st.info("Noch keine Daten vorhanden oder Index wird erstellt.")
+            
+    else:
+        st.warning("⚠️ Firebase ist noch nicht konfiguriert.")
+        st.info("Bitte füge deine Service Account Daten in `.streamlit/secrets.toml` ein, um die Cloud-Speicherung zu aktivieren.")
 
 with tab_opt:
     st.markdown("### 🚀 Generative Design using Smart+NN Gold Standard")
