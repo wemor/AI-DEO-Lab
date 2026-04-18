@@ -1,0 +1,79 @@
+﻿Loading Smart Domain Dataset...
+Training Smart Model on 120 samples...
+Predicting on 30 unseen holdout samples...
+
+============================================================
+ ERROR ANALYSIS RESULTS (Smart Domain DoE)
+============================================================
+
+--- WEIGHT_KG ---
+MAPE (Ï Fehler): 16.33% | MAE: 22.914
+Maximaler Fehler: 64.872 (entspricht 58.54%)
+Detail zum schlechtesten Sample (Index 12):
+  Echter Wert: 110.8100
+  Vorhersage : 175.6815
+  Geometrie / Material dieses Samples:
+    - length_mm: 2660.04
+    - width_mm: 51.69
+    - height_mm: 298.50
+    - density_kg_m3: 2700.00
+    - youngs_modulus_gpa: 69.00
+    - yield_strength_mpa: 250.00
+
+--- DEFLECTION_MM ---
+MAPE (Ï Fehler): 56.66% | MAE: 0.023
+Maximaler Fehler: 0.104 (entspricht 343.09%)
+Detail zum schlechtesten Sample (Index 56):
+  Echter Wert: 0.3530
+  Vorhersage : 0.2489
+  Geometrie / Material dieses Samples:
+    - length_mm: 2980.45
+    - width_mm: 146.70
+    - height_mm: 105.12
+    - density_kg_m3: 4500.00
+    - youngs_modulus_gpa: 110.00
+    - yield_strength_mpa: 880.00
+
+--- MAX_STRESS_MPA ---
+MAPE (Ï Fehler): 12.58% | MAE: 0.202
+Maximaler Fehler: 0.790 (entspricht 32.17%)
+Detail zum schlechtesten Sample (Index 55):
+  Echter Wert: 4.9950
+  Vorhersage : 4.2047
+  Geometrie / Material dieses Samples:
+    - length_mm: 2927.88
+    - width_mm: 71.31
+    - height_mm: 111.03
+    - density_kg_m3: 7850.00
+    - youngs_modulus_gpa: 210.00
+    - yield_strength_mpa: 350.00
+
+--- SAFETY_FACTOR ---
+MAPE (Ï Fehler): 33.26% | MAE: 194.191
+Maximaler Fehler: 1359.495 (entspricht 111.28%)
+Detail zum schlechtesten Sample (Index 78):
+  Echter Wert: 1221.6370
+  Vorhersage : 2581.1323
+  Geometrie / Material dieses Samples:
+    - length_mm: 1074.87
+    - width_mm: 95.78
+    - height_mm: 286.80
+    - density_kg_m3: 2700.00
+    - youngs_modulus_gpa: 69.00
+    - yield_strength_mpa: 250.00
+
+--- EIGENFREQUENCY_HZ ---
+MAPE (Ï Fehler): 7.30% | MAE: 10.522
+Maximaler Fehler: 44.109 (entspricht 21.29%)
+Detail zum schlechtesten Sample (Index 145):
+  Echter Wert: 280.0450
+  Vorhersage : 235.9361
+  Geometrie / Material dieses Samples:
+    - length_mm: 1537.24
+    - width_mm: 127.74
+    - height_mm: 288.69
+    - density_kg_m3: 2700.00
+    - youngs_modulus_gpa: 69.00
+    - yield_strength_mpa: 250.00
+
+Saved Error Distribution Plot -> reports/figures/06_smart_error_distribution.png
