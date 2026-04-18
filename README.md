@@ -59,3 +59,24 @@ Als Beweis für die Skalierbarkeit (Return on Investment) dieser Struktur wurde 
 > **Ingenieurswesen trifft Data Science:** 
 > Die größte Einstiegshürde ist oft der Glaube, KI sei eine magische "Black Box". Dieses Projekt beweist radikal das Gegenteil: **KI kann nicht zaubern.** Sie erfindet keine Physik aus dem Nichts, sondern sie interpoliert ausschließlich die Datenräume, die man ihr aufspannt.
 > Das wahre Erfolgsgeheimnis moderner ML-Modelle in der Entwicklung liegt nicht in immer komplexeren Algorithmen, sondern in der direkten **Domain Expertise des Ingenieurs**. Wenn ein klassischer Konstrukteur seinen physikalischen Gültigkeitsbereich ("Design Space") versteht und diesen sauber mittels Design of Experiments (LHS) abtastet, bricht er den Mythos der Black Box. Aus der vermeintlichen Magie wird dann ein exzellentes, logisches und hochpräzises Werkzeug für das Virtual Engineering.
+
+---
+
+## 🌐 Cloud Deployment & Firebase
+
+Dieses Projekt ist für die **Streamlit Community Cloud** und **Firebase/Firestore** optimiert.
+
+### 1. Firebase Setup
+Um die Speicherfunktion zu nutzen, wird eine Firebase-Datenbank benötigt:
+1. Erzeuge in der Firebase Console ein Projekt.
+2. Erstelle eine **Firestore** Datenbank.
+3. Generiere einen **Service Account Key** (JSON).
+4. Erstelle lokal eine Datei `.streamlit/secrets.toml` (basierend auf der `secrets.toml.template`) und trage die Werte ein.
+
+### 2. Streamlit Cloud Deployment
+1. Push den Code auf GitHub.
+2. Verbinde dein GitHub Repo mit [share.streamlit.io](https://share.streamlit.io).
+3. Füge in den **Secrets** der Streamlit Cloud den Inhalt deiner `secrets.toml` ein.
+
+---
+*Entwickelt als interaktives Learning Lab für die Schnittstelle zwischen Mechanical Engineering und Data Science.*

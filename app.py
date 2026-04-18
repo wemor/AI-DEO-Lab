@@ -18,6 +18,7 @@ from sklearn.neural_network import MLPRegressor
 
 # Local imports
 from src.physics_sim import simulate_beam
+from src.visualization import plot_beam_3d
 
 # --- 1. Page Config & Theme ---
 st.set_page_config(page_title="AI-DOE Lab", page_icon="🏗️", layout="wide")
@@ -189,14 +190,14 @@ with st.sidebar.expander("🏗️ Beam Configuration", expanded=True):
     mat_choice = st.selectbox("Material Choice", list(materials_dict.keys()))
     mat = materials_dict[mat_choice]
     length = st.slider("Length [mm]", 500, 3000, 1000)
-    width = st.slider("Width [mm]", 20, 300, 50)
-    height = st.slider("Height [mm]", 20, 500, 100)
+    width = st.slider("Width [mm]", 20, 300, int(st.session_state.get('opt_w', 50)))
+    height = st.slider("Height [mm]", 20, 500, int(st.session_state.get('opt_h', 100)))
     density, youngs, yield_str = st.number_input("Density", value=float(mat["d"])), st.number_input("Youngs", value=float(mat["y"])), st.number_input("Yield", value=float(mat["s"]))
 
 with st.sidebar.expander("🎯 Optimization Constraints", expanded=False):
-    max_defl = st.slider("Max Deflection [mm]", 0.1, 20.0, 5.0)
-    min_freq = st.slider("Min Frequency [Hz]", 1, 500, 30)
-    min_sf = st.slider("Min Safety Factor", 1.0, 10.0, 3.0)
+    max_defl = st.slider("Max Deflection [mm]", 0.1, 20.0, 5.0, help="Maximale zulässige Durchbiegung in der Mitte.")
+    min_freq = st.slider("Min Frequency [Hz]", 1, 500, 30, help="Minimale Eigenfrequenz zur Vermeidung von Resonanz.")
+    min_sf = st.slider("Min Safety Factor", 1.0, 10.0, 3.0, help="Sicherheitsfaktor gegenüber der Streckgrenze.")
 
 # --- 5. Main View (Tab 1) ---
 tab_sim, tab_file, tab_opt, tab_docs = st.tabs(["📊 Live Simulation", "💾 Storage", "🚀 Inverse Design", "📚 Docs"])
@@ -226,6 +227,12 @@ with tab_sim:
     
     st.markdown("---")
     
+    # 3D Visualization
+    fig = plot_beam_3d(length, width, height, phys_res['deflection_mm'].iloc[0])
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    
     # Physics Calculation
     phys_res = simulate_beam(input_df)
     p_vals = [phys_res['weight_kg'].iloc[0], phys_res['deflection_mm'].iloc[0], phys_res['max_stress_mpa'].iloc[0], phys_res['safety_factor'].iloc[0], phys_res['eigenfrequency_hz'].iloc[0]]
@@ -243,22 +250,29 @@ with tab_sim:
     p_c = get_preds(choice_c)
 
     lbls = ["Weight [kg]", "Deflection [mm]", "Stress [MPa]", "Safety Factor", "Frequency [Hz]"]
+    helps = [
+        "Das Gesamtgewicht des Trägers basierend auf Geometrie und Materialdichte.",
+        "Die maximale vertikale Absenkung in der Mitte des Trägers unter Last.",
+        "Die maximale mechanische Spannung in der Randfaser (Sollte unter der Streckgrenze liegen).",
+        "Verhältnis von Streckgrenze zu auftretender Spannung (SF > 1.0 ist sicher).",
+        "Die erste natürliche Eigenfrequenz. Wichtig für die Vibrationsanalyse."
+    ]
     
     with c1:
         st.markdown("#### 🛠️ Physik")
-        for i in range(5): st.metric(lbls[i], f"{p_vals[i]:.2f}")
+        for i in range(5): st.metric(lbls[i], f"{p_vals[i]:.2f}", help=helps[i])
 
     with c2:
         st.markdown(f"#### A: {choice_a}")
-        for i in range(5): st.metric("", f"{p_a[i]:.2f}", delta=f"{p_a[i]-p_vals[i]:.3f}", delta_color="inverse")
+        for i in range(5): st.metric("", f"{p_a[i]:.2f}", delta=f"{p_a[i]-p_vals[i]:.3f}", delta_color="inverse", help=helps[i])
 
     with c3:
         st.markdown(f"#### B: {choice_b}")
-        for i in range(5): st.metric("", f"{p_b[i]:.2f}", delta=f"{p_b[i]-p_vals[i]:.3f}", delta_color="inverse")
+        for i in range(5): st.metric("", f"{p_b[i]:.2f}", delta=f"{p_b[i]-p_vals[i]:.3f}", delta_color="inverse", help=helps[i])
 
     with c4:
         st.markdown(f"#### C: {choice_c}")
-        for i in range(5): st.metric("", f"{p_c[i]:.2f}", delta=f"{p_c[i]-p_vals[i]:.3f}", delta_color="inverse")
+        for i in range(5): st.metric("", f"{p_c[i]:.2f}", delta=f"{p_c[i]-p_vals[i]:.3f}", delta_color="inverse", help=helps[i])
 
     # Error Chart
     st.markdown("---")
@@ -283,9 +297,81 @@ with tab_file:
 
 with tab_opt:
     st.markdown("### 🚀 Generative Design using Smart+NN Gold Standard")
-    if st.button("Optimize"):
-        st.spinner("Optimizing...")
-        st.success("Optimal Design found!")
+    st.write("Finde die leichteste Geometrie (Breite/Höhe), die alle mechanischen Grenzwerte einhält.")
+    
+    if st.button("🚀 Design optimieren", use_container_width=True):
+        with st.spinner("KI-Optimierung läuft..."):
+            model = st.session_state.models["smart_nn"]
+            
+            def objective(x):
+                # x = [width, height]
+                test_df = pd.DataFrame([{
+                    "length_mm": float(length), "width_mm": x[0], "height_mm": x[1],
+                    "density_kg_m3": float(density), "youngs_modulus_gpa": float(youngs), "yield_strength_mpa": float(yield_str)
+                }])
+                preds = model.predict(test_df[FEATURES])[0]
+                return preds[0] # weight_kg
+            
+            def constraint_defl(x):
+                test_df = pd.DataFrame([{
+                    "length_mm": float(length), "width_mm": x[0], "height_mm": x[1],
+                    "density_kg_m3": float(density), "youngs_modulus_gpa": float(youngs), "yield_strength_mpa": float(yield_str)
+                }])
+                preds = model.predict(test_df[FEATURES])[0]
+                return max_defl - preds[1] # max_defl - deflection >= 0
+
+            def constraint_stress(x):
+                test_df = pd.DataFrame([{
+                    "length_mm": float(length), "width_mm": x[0], "height_mm": x[1],
+                    "density_kg_m3": float(density), "youngs_modulus_gpa": float(youngs), "yield_strength_mpa": float(yield_str)
+                }])
+                preds = model.predict(test_df[FEATURES])[0]
+                sf = yield_str / (abs(preds[2]) + 1e-9)
+                return sf - min_sf # sf - min_sf >= 0
+
+            def constraint_freq(x):
+                test_df = pd.DataFrame([{
+                    "length_mm": float(length), "width_mm": x[0], "height_mm": x[1],
+                    "density_kg_m3": float(density), "youngs_modulus_gpa": float(youngs), "yield_strength_mpa": float(yield_str)
+                }])
+                preds = model.predict(test_df[FEATURES])[0]
+                return preds[3] - min_freq # freq - min_freq >= 0
+
+            cons = [
+                {'type': 'ineq', 'fun': constraint_defl},
+                {'type': 'ineq', 'fun': constraint_stress},
+                {'type': 'ineq', 'fun': constraint_freq}
+            ]
+            
+            res = minimize(objective, x0=[width, height], bounds=[(20, 300), (20, 500)], constraints=cons, method='COBYLA')
+            
+            if res.success:
+                opt_w, opt_h = res.x
+                st.success(f"Optimale Geometrie gefunden: Breite={opt_w:.1f}mm, Höhe={opt_h:.1f}mm")
+                
+                # Compare with current
+                opt_df = pd.DataFrame([{
+                    "length_mm": float(length), "width_mm": opt_w, "height_mm": opt_h,
+                    "density_kg_m3": float(density), "youngs_modulus_gpa": float(youngs), "yield_strength_mpa": float(yield_str)
+                }])
+                opt_res = simulate_beam(opt_df)
+                
+                col_res1, col_res2 = st.columns(2)
+                with col_res1:
+                    st.write("**Aktuelles Design:**")
+                    st.write(f"Gewicht: {phys_res['weight_kg'].iloc[0]:.2f} kg")
+                with col_res2:
+                    st.write("**Optimiertes Design:**")
+                    st.write(f"Gewicht: {opt_res['weight_kg'].iloc[0]:.2f} kg")
+                
+                st.info(f"Einsparungspotenzial: {((phys_res['weight_kg'].iloc[0] - opt_res['weight_kg'].iloc[0]) / phys_res['weight_kg'].iloc[0]) * 100:.1f}%")
+                
+                if st.button("Optimierte Maße übernehmen"):
+                    st.session_state.opt_w = opt_w
+                    st.session_state.opt_h = opt_h
+                    st.rerun()
+            else:
+                st.error("Keine gültige Lösung gefunden. Constraints lockern?")
 
 with tab_docs:
     try: st.markdown(open("docs/PROJECT_DOCUMENTATION.md", "r", encoding="utf-8").read())
