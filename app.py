@@ -62,43 +62,42 @@ st.markdown(
         display: flex !important;
         flex-direction: row !important;
         align-items: baseline !important;
-        gap: 0.8rem !important;
+        gap: 0.5rem !important;
     }
 
-    /* Label bleibt oben */
     [data-testid="stMetricLabel"] {
-        font-size: 0.8rem !important;
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+        color: #8b949e !important;
+        margin-bottom: -5px !important;
     }
 
-    /* Wert-Styling */
     [data-testid="stMetricValue"] {
-        font-size: 1.5rem !important;
+        font-size: 1.3rem !important;
         width: auto !important;
     }
 
-    /* Delta-Styling: Kein Margin nach oben, bündig mit dem Wert */
     [data-testid="stMetricDelta"] {
         font-size: 0.8rem !important;
-        display: inline-flex !important;
-        align-items: baseline !important;
         margin-top: 0 !important;
     }
-    /* Leere Labels in KI-Spalten (Spalte 2, 3 & 4) komplett ausblenden */
-    [data-testid="column"]:nth-of-type(2) [data-testid="stMetricLabel"],
-    [data-testid="column"]:nth-of-type(3) [data-testid="stMetricLabel"],
-    [data-testid="column"]:nth-of-type(4) [data-testid="stMetricLabel"] {
-        display: none !important;
-    }
     
-    /* Sicherstellen, dass die Werte ohne Versatz ganz oben stehen */
-    [data-testid="column"]:nth-of-type(n+2) [data-testid="stMetricValue"] {
-        margin-top: 0px !important;
+    /* Dedicated styling for the first column (Labels) */
+    [data-testid="column"]:nth-of-type(1) [data-testid="stMetricValue"] {
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+        color: #ffffff !important;
     }
+    [data-testid="column"]:nth-of-type(1) [data-testid="stMetricLabel"] {
+        padding-bottom: 12px !important;
+    }
+
     .stMetric {
         background-color: #161b22;
         border: 1px solid #30363d;
-        padding: 5px;
+        padding: 8px;
         border-radius: 8px;
+        height: 100% !important;
     }
     </style>
     """,
@@ -251,8 +250,9 @@ with tab_sim:
     
     st.markdown("---")
     
-    # Display 5-Column Metric View
-    c1, c2, c3, c4, c5 = st.columns(5)
+    # Display 6-Column Tabular Metric View
+    # [Labels | Physics | Model A | Model B | Model C | Model D]
+    c_lab, c1, c2, c3, c4, c5 = st.columns([1.2, 1, 1, 1, 1, 1])
     
     def get_preds(key):
         preds = st.session_state.models[OPTIONS[key]].predict(input_df[FEATURES])[0]
@@ -272,26 +272,33 @@ with tab_sim:
         "Verhältnis von Streckgrenze zu auftretender Spannung (SF > 1.0 ist sicher).",
         "Die erste natürliche Eigenfrequenz. Wichtig für die Vibrationsanalyse."
     ]
+
+    with c_lab:
+        st.markdown("<p style='font-size: 0.9rem; font-weight: bold; margin-bottom: 10px;'>📏 Metric</p>", unsafe_allow_html=True)
+        for i in range(5):
+            # Symmetric st.metric for perfect alignment
+            # Using label for spacing and value for the actual name
+            st.metric(" ", lbls[i])
     
     with c1:
-        st.markdown("#### 🛠️ Physik")
-        for i in range(5): st.metric(lbls[i], f"{p_vals[i]:.2f}", help=helps[i])
+        st.markdown("<p style='font-size: 0.9rem; font-weight: bold; margin-bottom: 10px;'>🛠️ Physik</p>", unsafe_allow_html=True)
+        for i in range(5): st.metric("Ref", f"{p_vals[i]:.2f}", help=helps[i])
 
     with c2:
-        st.markdown(f"#### A: {choice_a}")
-        for i in range(5): st.metric("", f"{p_a[i]:.2f}", delta=f"{p_a[i]-p_vals[i]:.3f}", delta_color="inverse", help=helps[i])
+        st.markdown(f"<p style='font-size: 0.9rem; font-weight: bold; margin-bottom: 10px;'>A: {choice_a}</p>", unsafe_allow_html=True)
+        for i in range(5): st.metric("Pred", f"{p_a[i]:.2f}", delta=f"{p_a[i]-p_vals[i]:.3f}", delta_color="normal", help=helps[i])
 
     with c3:
-        st.markdown(f"#### B: {choice_b}")
-        for i in range(5): st.metric("", f"{p_b[i]:.2f}", delta=f"{p_b[i]-p_vals[i]:.3f}", delta_color="inverse", help=helps[i])
+        st.markdown(f"<p style='font-size: 0.9rem; font-weight: bold; margin-bottom: 10px;'>B: {choice_b}</p>", unsafe_allow_html=True)
+        for i in range(5): st.metric("Pred", f"{p_b[i]:.2f}", delta=f"{p_b[i]-p_vals[i]:.3f}", delta_color="normal", help=helps[i])
 
     with c4:
-        st.markdown(f"#### C: {choice_c}")
-        for i in range(5): st.metric("", f"{p_c[i]:.2f}", delta=f"{p_c[i]-p_vals[i]:.3f}", delta_color="inverse", help=helps[i])
+        st.markdown(f"<p style='font-size: 0.9rem; font-weight: bold; margin-bottom: 10px;'>C: {choice_c}</p>", unsafe_allow_html=True)
+        for i in range(5): st.metric("Pred", f"{p_c[i]:.2f}", delta=f"{p_c[i]-p_vals[i]:.3f}", delta_color="normal", help=helps[i])
 
     with c5:
-        st.markdown(f"#### D: {choice_d}")
-        for i in range(5): st.metric("", f"{p_d[i]:.2f}", delta=f"{p_d[i]-p_vals[i]:.3f}", delta_color="inverse", help=helps[i])
+        st.markdown(f"<p style='font-size: 0.9rem; font-weight: bold; margin-bottom: 10px;'>D: {choice_d}</p>", unsafe_allow_html=True)
+        for i in range(5): st.metric("Pred", f"{p_d[i]:.2f}", delta=f"{p_d[i]-p_vals[i]:.3f}", delta_color="normal", help=helps[i])
 
     # Error Chart (All 4 variants)
     st.markdown("---")
