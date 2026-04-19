@@ -18,7 +18,7 @@ from sklearn.neural_network import MLPRegressor
 
 # Local imports
 from src.physics_sim import simulate_beam
-from src.visualization import plot_beam_3d
+from src.visualization import plot_beam_3d, plot_doe_distribution_plotly, plot_accuracy_comparison_plotly
 
 # --- 1. Page Config & Theme ---
 st.set_page_config(page_title="AI-DOE Lab", page_icon="🏗️", layout="wide")
@@ -110,30 +110,33 @@ st.markdown(
 FEATURES = ["length_mm", "width_mm", "height_mm", "density_kg_m3", "youngs_modulus_gpa", "yield_strength_mpa"]
 TARGETS = ["weight_kg", "deflection_mm", "max_stress_mpa", "eigenfrequency_hz"]
 
-def generate_live_data(n_samples, strategy="smart"):
+def generate_live_data(n_samples, strategy="smart", seed=None):
     materials = [
         {"density_kg_m3": 7850.0, "youngs_modulus_gpa": 210.0, "yield_strength_mpa": 350.0}, # Steel
         {"density_kg_m3": 2700.0, "youngs_modulus_gpa": 69.0,  "yield_strength_mpa": 250.0}, # Aluminum
         {"density_kg_m3": 4500.0, "youngs_modulus_gpa": 110.0, "yield_strength_mpa": 880.0}  # Titanium
     ]
 
+    rng = np.random.default_rng(seed)
+
     if strategy == "smart":
         l_bounds, w_bounds, h_bounds = [500, 3000], [20, 300], [20, 500]
         bounds = np.array([l_bounds, w_bounds, h_bounds, [0.0, 3.0]])
-        sampler = qmc.LatinHypercube(d=4)
+        sampler = qmc.LatinHypercube(d=4, seed=seed)
         sample = sampler.random(n=n_samples)
         scaled = qmc.scale(sample, bounds[:, 0], bounds[:, 1])
         rows = []
         for s in scaled:
-            mat = materials[min(2, int(np.floor(s[3])))]
+            mat_idx = min(2, int(np.floor(s[3])))
+            mat = materials[mat_idx]
             rows.append({"length_mm": s[0], "width_mm": s[1], "height_mm": s[2], "density_kg_m3": mat["density_kg_m3"], "youngs_modulus_gpa": mat["youngs_modulus_gpa"], "yield_strength_mpa": mat["yield_strength_mpa"]})
     else:
         rows = []
         for _ in range(n_samples):
-            l = np.random.choice([500.0, 3000.0]) + np.random.normal(0, 50)
-            w = np.random.choice([20.0, 300.0]) + np.random.normal(0, 5)
-            h = np.random.choice([20.0, 500.0]) + np.random.normal(0, 10)
-            mat = materials[np.random.randint(0, 3)]
+            l = rng.choice([500.0, 3000.0]) + rng.normal(0, 50)
+            w = rng.choice([20.0, 300.0]) + rng.normal(0, 5)
+            h = rng.choice([20.0, 500.0]) + rng.normal(0, 10)
+            mat = materials[rng.integers(0, 3)]
             rows.append({"length_mm": max(500, min(3000, l)), "width_mm": max(20, min(300, w)), "height_mm": max(20, min(500, h)), "density_kg_m3": mat["density_kg_m3"], "youngs_modulus_gpa": mat["youngs_modulus_gpa"], "yield_strength_mpa": mat["yield_strength_mpa"]})
             
     df = pd.DataFrame(rows)
@@ -152,11 +155,17 @@ def train_model(df, model_type="nn"):
 # --- 4. Session State & Sidebar ---
 if "models" not in st.session_state:
     st.session_state.models = None
+    st.session_state.training_df_smart = None
+    st.session_state.training_df_bad = None
+    st.session_state.evaluation_df = None
 
 if st.session_state.models is None:
     with st.spinner("🚀 Training all 4 AI variants..."):
         df_smart = generate_live_data(120, "smart")
         df_bad = generate_live_data(30, "bad")
+        st.session_state.evaluation_df = generate_live_data(50, "smart", seed=42) # Fixed seed for reproducibility
+        st.session_state.training_df_smart = df_smart
+        st.session_state.training_df_bad = df_bad
         st.session_state.models = {
             "bad_xgb": train_model(df_bad, "xgb"),
             "bad_nn": train_model(df_bad, "nn"),
@@ -175,6 +184,9 @@ with st.sidebar.expander("🎓 AI Training Setup", expanded=True):
         with st.spinner("Training 4 variants..."):
             df_smart_new = generate_live_data(n_smart_in, "smart")
             df_bad_new = generate_live_data(n_bad_in, "bad")
+            st.session_state.evaluation_df = generate_live_data(50, "smart", seed=42) # Reproducible test set
+            st.session_state.training_df_smart = df_smart_new
+            st.session_state.training_df_bad = df_bad_new
             st.session_state.models = {
                 "bad_xgb": train_model(df_bad_new, "xgb"),
                 "bad_nn": train_model(df_bad_new, "nn"),
@@ -209,21 +221,23 @@ with tab_sim:
     
     # Comparison Slot Configuration
     st.markdown("#### Vergleichs-Konfiguration")
-    slot_cols = st.columns(3)
+    slot_cols = st.columns(4)
     
     OPTIONS = {
         "Bad DoE + XGBoost": "bad_xgb",
-        "Bad DoE + Neural Net": "bad_nn",
+        "Bad DoE + NN": "bad_nn",
         "Smart DoE + XGBoost": "smart_xgb",
-        "Smart DoE + Neural Net": "smart_nn"
+        "Smart DoE + NN": "smart_nn"
     }
     
     with slot_cols[0]:
         choice_a = st.selectbox("Slot A (Spalte 2)", list(OPTIONS.keys()), index=0)
     with slot_cols[1]:
-        choice_b = st.selectbox("Slot B (Spalte 3)", list(OPTIONS.keys()), index=2)
+        choice_b = st.selectbox("Slot B (Spalte 3)", list(OPTIONS.keys()), index=1)
     with slot_cols[2]:
-        choice_c = st.selectbox("Slot C (Spalte 4)", list(OPTIONS.keys()), index=3)
+        choice_c = st.selectbox("Slot C (Spalte 4)", list(OPTIONS.keys()), index=2)
+    with slot_cols[3]:
+        choice_d = st.selectbox("Slot D (Spalte 5)", list(OPTIONS.keys()), index=3)
     
     st.markdown("---")
     
@@ -237,8 +251,8 @@ with tab_sim:
     
     st.markdown("---")
     
-    # Display 4-Column Metric View
-    c1, c2, c3, c4 = st.columns(4)
+    # Display 5-Column Metric View
+    c1, c2, c3, c4, c5 = st.columns(5)
     
     def get_preds(key):
         preds = st.session_state.models[OPTIONS[key]].predict(input_df[FEATURES])[0]
@@ -248,6 +262,7 @@ with tab_sim:
     p_a = get_preds(choice_a)
     p_b = get_preds(choice_b)
     p_c = get_preds(choice_c)
+    p_d = get_preds(choice_d)
 
     lbls = ["Weight [kg]", "Deflection [mm]", "Stress [MPa]", "Safety Factor", "Frequency [Hz]"]
     helps = [
@@ -274,21 +289,108 @@ with tab_sim:
         st.markdown(f"#### C: {choice_c}")
         for i in range(5): st.metric("", f"{p_c[i]:.2f}", delta=f"{p_c[i]-p_vals[i]:.3f}", delta_color="inverse", help=helps[i])
 
-    # Error Chart
+    with c5:
+        st.markdown(f"#### D: {choice_d}")
+        for i in range(5): st.metric("", f"{p_d[i]:.2f}", delta=f"{p_d[i]-p_vals[i]:.3f}", delta_color="inverse", help=helps[i])
+
+    # Error Chart (All 4 variants)
     st.markdown("---")
     st.markdown("#### 📈 Abweichungen im Vergleich [%]")
+    
     def err_perc(preds): return [(abs(a - p) / (p + 1e-9)) * 100 for a, p in zip(preds, p_vals)]
     
-    comp_df = pd.DataFrame({
-        "Metric": ["Wgt", "Def", "Str", "SF", "Frq"] * 3,
-        "Error [%]": err_perc(p_a) + err_perc(p_b) + err_perc(p_c),
-        "Source": [choice_a]*5 + [choice_b]*5 + [choice_c]*5
-    })
+    # Calculate errors for all 4 available variants
+    error_data = []
+    for name, key in OPTIONS.items():
+        # Get raw ML preds (4 targets)
+        raw_p = st.session_state.models[key].predict(input_df[FEATURES])[0]
+        # Insert safety factor calculation (derived) to match p_vals index
+        # p_vals: [Wgt, Def, Str, SF, Frq]
+        # raw_p:  [Wgt, Def, Str, Frq]
+        sf_pred = input_df['yield_strength_mpa'].iloc[0] / (raw_p[2] + 1e-9)
+        full_p = [raw_p[0], raw_p[1], raw_p[2], sf_pred, raw_p[3]]
+        
+        errors = err_perc(full_p)
+        for metric, err in zip(["Wgt", "Def", "Str", "SF", "Frq"], errors):
+            error_data.append({"Metric": metric, "Error [%]": err, "Source": name})
+            
+    comp_df = pd.DataFrame(error_data)
     
-    import altair as alt
-    st.altair_chart(alt.Chart(comp_df).mark_bar().encode(
-        x=alt.X('Metric:N', title=None), y='Error [%]:Q', color='Source:N', column=alt.Column('Metric:N', title=None)
-    ).properties(width=100, height=200))
+    import plotly.express as px
+    fig_err = px.bar(
+        comp_df, x="Metric", y="Error [%]", color="Source", 
+        barmode="group",
+        title="Abweichungen im Vergleich [%] (Log-Skala)",
+        color_discrete_sequence=px.colors.qualitative.Vivid,
+        hover_data={"Error [%]": ":.2f"},
+        log_y=True
+    )
+    fig_err.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgb(220, 220, 220)',
+        font=dict(color="white"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    fig_err.update_yaxes(
+        gridcolor="white", 
+        zerolinecolor="white",
+        tickfont=dict(color="white"),
+        title_font=dict(color="white")
+    )
+    fig_err.update_xaxes(
+        gridcolor="white", 
+        zerolinecolor="white",
+        tickfont=dict(color="white"),
+        title_font=dict(color="white")
+    )
+    st.plotly_chart(fig_err, use_container_width=True)
+    st.info("ℹ️ **Hinweis zur Log-Skala:** Da das schlechte Modell Fehler von über 1000% produziert, das gute Modell aber im Bereich von 0.1% liegt, nutzen wir hier eine logarithmische Skalierung. So bleiben auch kleine Präzisionsunterschiede sichtbar.")
+
+    # --- 🎓 AI Insight: Design of Experiments (DoE) Analyse ---
+    with st.expander("🎓 AI Insight: Design of Experiments (DoE) Analyse", expanded=False):
+        st.markdown("""
+        **Was sehen wir hier?**  
+        Diese Grafik zeigt den "Wissensraum", mit dem die KI trainiert wurde. 
+        
+        **Wichtig für Ingenieure:**  
+        Während die Geometrie (z.B. Länge) kontinuierlich variiert, sind die Materialeigenschaften (wie der *Young's Modulus*) **diskret** angesetzt. Wir nutzen einen Katalog aus realen Materialien (Stahl, Aluminium, Titan) anstatt beliebiger theoretischer Zwischenwerte.
+        
+        **Warum scheitern einige Modelle?**  
+        * **Links (Bad DoE):** Die Datenpunkte sind eng geclustert (z.B. nur bei extremen Längen). Die KI lernt dort zwar perfekt, hat aber „keine Ahnung“, was dazwischen passiert (Interpolationsfehler).  
+        * **Rechts (Smart DoE):** Dank *Latin Hypercube Sampling (LHS)* sind die Datenpunkte strategisch über den gesamten Raum verteilt. Die KI lernt die Physik für alle Kombinationen, was sie zu einem robusten Werkzeug für das Engineering macht.
+        """)
+        if st.session_state.training_df_smart is not None and st.session_state.training_df_bad is not None:
+            fig_doe = plot_doe_distribution_plotly(st.session_state.training_df_smart, st.session_state.training_df_bad)
+            st.plotly_chart(fig_doe, use_container_width=True)
+
+        st.markdown("---")
+        st.markdown("#### 🎯 Performance-Check: True vs. Predicted")
+        st.markdown("""
+        Hier prüfen wir die Modelle auf Herz und Nieren. Die Diagonale (gestrichelt) stellt die **physikalische Wahrheit** (Ground Truth) dar. 
+        
+        **Methodik der Test-Zusammenstellung:**
+        *   **Unabhängiger Blind-Test:** Wir nutzen 50 komplett neue virtuelle Experimente, die kein Teil des Trainings waren. So testen wir die echte „Intelligenz“.
+        *   **Maximale Abdeckung (LHS):** Die Punkte sind mittels *Latin Hypercube Sampling* über den gesamten Designraum verteilt, um Lücken im Wissen aufzudecken.
+        *   **Fixierter Benchmark:** Damit du die Verbesserung der Modelle direkt vergleichen kannst, nutzen wir einen festen Startwert (Seed). So bleibt der „Prüfstand“ immer gleich, während du die KI neu trainierst.
+        *   **Physik-Referenz:** Jeder Testpunkt wurde im Hintergrund mit dem echten Physik-Modell berechnet.
+        
+        **Interpretation:** Je näher die Punkte an der Diagonale liegen, desto besser hat die KI die Physik verstanden statt nur Daten auswendig zu lernen.
+        """)
+        
+        if st.session_state.evaluation_df is not None:
+            # Create tabs for each target metric
+            tabs = st.tabs([t.replace("_", " ").title() for t in TARGETS])
+            
+            for i, target in enumerate(TARGETS):
+                with tabs[i]:
+                    # Predict all variants for the evaluation set for this specific target
+                    y_preds_eval = {}
+                    for name, key in OPTIONS.items():
+                        # TARGETS maps to the indices of the prediction output
+                        y_preds_eval[name] = st.session_state.models[key].predict(st.session_state.evaluation_df[FEATURES])[:, i]
+                    
+                    fig_acc = plot_accuracy_comparison_plotly(st.session_state.evaluation_df, y_preds_eval, target)
+                    st.plotly_chart(fig_acc, use_container_width=True, key=f"acc_plot_{target}")
 
 # Tabs Storage, Opt and Docs (Brief)
 with tab_file:
